@@ -43,13 +43,15 @@
                                     <asp:TextBox ID="txtPassword" runat="server" CssClass="form-control mb-5" placeholder="Enter Password"></asp:TextBox>
                                     <asp:Label ID="Label3" runat="server" CssClass="mt-5" Text="Encryption"></asp:Label>
 
-                                    <asp:RadioButtonList ID="rbEncryption" runat="server" CssClass="mt-5" AutoPostBack="false">
+                                    <asp:RadioButtonList ID="rbEncryption" runat="server" CssClass="mt-5">
                                         <asp:ListItem Value="WEP">WEP</asp:ListItem>
-                                        <asp:ListItem Value="WPA/WPA2/WPA3">WPA/WPA2/WPA3</asp:ListItem>
-                                        <asp:ListItem Value="WAP2-EAP">WAP2-EAP</asp:ListItem>
-                                        <asp:ListItem Value="None">None</asp:ListItem>
+                                        <asp:ListItem Value="WPA">WPA (WPA-Personal)</asp:ListItem>
+                                        <asp:ListItem Value="WPA2">WPA2 (WPA2-Personal)</asp:ListItem>
+                                        <asp:ListItem Value="WPA3">WPA3 (WPA3-Personal)</asp:ListItem>
+                                        <asp:ListItem Value="None">None (Open Network)</asp:ListItem>
                                     </asp:RadioButtonList>
                                 </formview>
+                                
                             </div>
                         </div>
                         <div class="col-md-4">
@@ -60,6 +62,14 @@
                                     <h3>Cardify</h3>
                                 </div>
                                 <div id="qrcode"></div>
+                                <div class="alert alert-info mt-3">
+                                    <strong>Usage tips:</strong>
+                                    <ul>
+                                        <li>Ensure device WiFi is enabled</li>
+                                        <li>Position QR code within camera frame</li>
+                                        <li>For WPA3, ensure device compatibility</li>
+                                    </ul>
+                                </div>
                             </div>
 
                         </div>
@@ -97,18 +107,32 @@
 
         // Function to sanitize SSID & Password
         function escapeText(text) {
-            return text.replace(/([;:\\",])/g, '\\$1'); // Escapes special WiFi characters
+            return text.replace(/([\\";:,])/g, '\\$1');
         }
 
+
         // Function to generate WiFi QR Code
+
+        function validateInputs() {
+            let encryption = document.querySelector('input[name="<%= rbEncryption.ClientID %>"]:checked').value;
+            let password = document.getElementById("<%= txtPassword.ClientID %>").value;
+
+            if (encryption === "WEP" && (password.length !== 5 || password.length !== 13)) {
+                alert("WEP key must be 5 or 13 characters!");
+                return false;
+            }
+            return true;
+        }
+
+        // Attach validation to input events
+        document.getElementById("<%= txtPassword.ClientID %>").addEventListener("input", validateInputs);
+
         function updateQRCode() {
             let ssid = escapeText(document.getElementById("<%= txtSSID.ClientID %>").value.trim());
             let password = escapeText(document.getElementById("<%= txtPassword.ClientID %>").value.trim());
 
-            // Fix: Properly get selected encryption type
-            let encryption = "nopass"; // Default for open networks
+            let encryption = "nopass";
             let encryptionRadios = document.getElementsByName("<%= rbEncryption.ClientID %>");
-
             for (let i = 0; i < encryptionRadios.length; i++) {
                 if (encryptionRadios[i].checked) {
                     encryption = encryptionRadios[i].value;
@@ -116,21 +140,23 @@
                 }
             }
 
-            // Convert "None" to "nopass" for open networks
-            if (encryption.toLowerCase() === "none") {
+            // Handle 'None' selection for open networks
+            if (encryption === "None") {
                 encryption = "nopass";
-                password = ""; // Open networks do not require passwords
+                password = "";
             }
 
-            // Generate correct QR code text
-            let qrText = (encryption === "nopass")
-                ? `WIFI:S:${ssid};T:${encryption};;`  // No password for open networks
-                : `WIFI:S:${ssid};T:${encryption};P:${password};;`;
+            // Build QR code text
+            let qrText;
+            if (encryption === "nopass") {
+                qrText = `WIFI:S:${ssid};T:${encryption};;`;
+            } else {
+                qrText = `WIFI:S:${ssid};T:${encryption};P:${password};;`;
+            }
 
-            console.log("Generated QR Code:", qrText); // Debugging output
-
-            qr.clear();  // Clear previous QR code
-            qr.makeCode(qrText); // Generate new QR code
+            console.log("QR Code Text:", qrText);
+            qr.clear();
+            qr.makeCode(qrText);
         }
 
         // Attach Event Listeners for real-time updates
